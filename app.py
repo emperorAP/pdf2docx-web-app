@@ -14,22 +14,30 @@ def allowed_file(filename):
 @app.route('/', methods=['GET', 'POST'])
 def index():
     download_link = None
+    error_message = None
     if request.method == 'POST':
         if 'pdf-file' not in request.files:
-            return redirect(request.url)
-        file = request.files['pdf-file']
-        if file.filename == '':
-            return redirect(request.url)
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            word_path = os.path.join(app.config['DOWNLOAD_FOLDER'], filename.rsplit('.', 1)[0] + '.docx')
-            file.save(pdf_path)
-            pdf_to_word(pdf_path, word_path)
-            download_link = url_for('download_file', filename=filename.rsplit('.', 1)[0] + '.docx')
-    return render_template('index.html', download_link=download_link)
+            error_message = "No file part in the request."
+        else:
+            file = request.files['pdf-file']
+            if file.filename == '':
+                error_message = "No selected file."
+            elif file and allowed_file(file.filename):
+                try:
+                    filename = secure_filename(file.filename)
+                    pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    word_path = os.path.join(app.config['DOWNLOAD_FOLDER'], filename.rsplit('.', 1)[0] + '.docx')
+                    file.save(pdf_path)
+                    pdf_to_word(pdf_path, word_path)
+                    download_link = url_for('download_file', filename=filename.rsplit('.', 1)[0] + '.docx')
+                except Exception as e:
+                    error_message = f"An error occurred: {str(e)}"
+            else:
+                error_message = "Invalid file type. Only PDF files are allowed."
 
-@app.route('/downloads/<filename>', methods=['GET'])
+    return render_template('index.html', download_link=download_link, error_message=error_message)
+
+@app.route('/downloads/<filename>')
 def download_file(filename):
     return send_file(os.path.join(app.config['DOWNLOAD_FOLDER'], filename), as_attachment=True)
 
